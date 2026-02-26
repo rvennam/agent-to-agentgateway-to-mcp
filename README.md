@@ -28,12 +28,12 @@ In this workshop you will:
 | +-------|---------------------|------------+ |    | get_file_contents|
 |         |                     |              |    | create_issue,    |
 | +-------v-----------------+  |               |    | create_pr, ...   |
-| |  GitHub Agent           |  |  HTTPS        |    |                  |
+| |  My Agent               |  |  HTTPS        |    |                  |
 | |  Claude LLM             |  +---------------+--->|                  |
 | |  MCP Client             |  (injects PAT    |    |                  |
 | |  FastAPI + Web UI       |   + TLS + SNI)   |    |                  |
-| |  rvennam/github-agent   |                  |    |                  |
-| +-------------------------+                  |    +------------------+
+| +-------------------------+                  |    |                  |
+|                                              |    +------------------+
 +----------------------------------------------+
 ```
 
