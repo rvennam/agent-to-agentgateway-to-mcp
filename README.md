@@ -19,16 +19,16 @@ In this workshop you will:
 |                  Solo Agent Gateway                                |
 |  +--------------------------------------------------------------+  |
 |  |                                                              |  |
-|  |   /github-agent              /mcp-github                    |  |
+|  |   /github-agent              /mcp-github                     |  |
 |  |   (URL rewrite)              (auth injection)                |  |
 |  |        |                          |                          |  |
 |  +--------|--------------------------|--------------------------+  |
 |           |                          |                             |
 |  +--------v-----------------------+  |                             |
 |  |  GitHub Agent                  |  |                             |
-|  |  (ns: github-agent)           |  |                             |
+|  |  (ns: github-agent)            |  |                             |
 |  |                                |  |                             |
-|  |  Claude LLM + MCP Client -----+--+                             |
+|  |  Claude LLM + MCP Client ------+--+                             |
 |  |  FastAPI + Web UI              |                                |
 |  |  rvennam/github-agent          |                                |
 |  +--------------------------------+                                |
