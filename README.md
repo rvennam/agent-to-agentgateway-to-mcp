@@ -13,62 +13,61 @@ In this workshop you will:
 ### Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          Kubernetes Cluster                             │
-│                                                                         │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │                Solo Agent Gateway (enterprise-agentgateway)        │  │
-│  │                                                                    │  │
-│  │   /github-agent ──────────────┐   /mcp-github ─────────────────┐  │  │
-│  │   (HTTPRoute + URL rewrite)   │   (HTTPRoute + auth injection) │  │  │
-│  │                               │                                │  │  │
-│  └───────────────┬───────────────┘────────────────┬───────────────┘  │  │
-│                  │                                │                   │  │
-│  ┌───────────────▼───────────────┐  ┌─────────────▼─────────────┐   │  │
-│  │  GitHub Agent (ns: github-    │  │  AgentgatewayBackend      │   │  │
-│  │  agent)                       │  │  (github-mcp-backend)     │   │  │
-│  │                               │  │                           │   │  │
-│  │  Claude LLM ←→ MCP Client ───┼──▶  host: api.githubcopilot  │   │  │
-│  │  FastAPI + Web UI             │  │  port: 443 (TLS + SNI)    │   │  │
-│  │  image: rvennam/github-agent  │  │                           │   │  │
-│  └───────────────────────────────┘  └─────────────┬─────────────┘   │  │
-│                                                    │                 │  │
-└────────────────────────────────────────────────────┼─────────────────┘  │
-                                                     │ HTTPS              │
-                                                     ▼                   │
-                                        ┌──────────────────────────┐      │
-                                        │  GitHub Remote MCP Server │     │
-                                        │  api.githubcopilot.com    │     │
-                                        │                          │      │
-                                        │  43 tools: get_me,       │      │
-                                        │  get_file_contents,      │      │
-                                        │  create_pull_request,    │      │
-                                        │  search_repositories,    │      │
-                                        │  create_issue, ...       │      │
-                                        └──────────────────────────┘      │
+┌──────────────────────────────────────────────────────────────────────┐
+│                         Kubernetes Cluster                           │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │           Solo Agent Gateway (enterprise-agentgateway)         │  │
+│  │                                                                │  │
+│  │  /github-agent               /mcp-github                      │  │
+│  │  (HTTPRoute + URL rewrite)   (HTTPRoute + auth injection)     │  │
+│  └──────────┬───────────────────────────────┬────────────────────┘  │
+│             │                               │                       │
+│  ┌──────────▼──────────────────┐  ┌─────────▼──────────────────┐   │
+│  │  GitHub Agent               │  │  AgentgatewayBackend       │   │
+│  │  (ns: github-agent)         │  │  (github-mcp-backend)      │   │
+│  │                             │  │                            │   │
+│  │  Claude LLM ←→ MCP Client ─┼──▶  host: api.githubcopilot  │   │
+│  │  FastAPI + Web UI           │  │  port: 443 (TLS + SNI)    │   │
+│  │  rvennam/github-agent       │  │                            │   │
+│  └─────────────────────────────┘  └────────────┬───────────────┘   │
+│                                                 │                   │
+└─────────────────────────────────────────────────┼───────────────────┘
+                                                  │ HTTPS
+                                                  ▼
+                                     ┌────────────────────────────┐
+                                     │  GitHub Remote MCP Server  │
+                                     │  api.githubcopilot.com     │
+                                     │                            │
+                                     │  43 tools: get_me,         │
+                                     │  get_file_contents,        │
+                                     │  create_pull_request,      │
+                                     │  search_repositories,      │
+                                     │  create_issue, ...         │
+                                     └────────────────────────────┘
 ```
 
 **Request flow:**
 ```
-Browser             Agent Gateway          Agent Pod              Agent Gateway          GitHub MCP
-  │                      │                     │                       │                     │
-  │─ GET /github-agent ─>│                     │                       │                     │
-  │                      │─ rewrite to / ─────>│                       │                     │
-  │<── Web UI ───────────│<── HTML ────────────│                       │                     │
-  │                      │                     │                       │                     │
-  │─ POST /github-agent/ │                     │                       │                     │
-  │  chat ──────────────>│─ rewrite ──────────>│                       │                     │
-  │                      │                     │─ MCP tools/call ─────>│                     │
-  │                      │                     │  (no auth needed)     │─ inject Bearer ────>│
-  │                      │                     │                       │─ TLS to :443 ──────>│
-  │                      │                     │                       │                     │
-  │                      │                     │                       │<── tool result ─────│
-  │                      │                     │<── MCP result ────────│                     │
-  │                      │                     │                       │                     │
-  │                      │                     │─ Claude LLM call ─────────────────────────> │
-  │                      │                     │<── assistant response ◄─────────────────────│
-  │                      │<── JSON response ───│                       │                     │
-  │<── chat response ────│                     │                       │                     │
+Browser          AgentGateway        Agent Pod         AgentGateway        GitHub MCP
+   │                  │                  │                  │                  │
+   │── GET ──────────>│                  │                  │                  │
+   │   /github-agent  │── rewrite / ───>│                  │                  │
+   │<── Web UI ───────│<── HTML ────────│                  │                  │
+   │                  │                  │                  │                  │
+   │── POST ─────────>│                  │                  │                  │
+   │   /github-agent  │── rewrite / ───>│                  │                  │
+   │   /chat          │                  │── MCP ─────────>│                  │
+   │                  │                  │   tools/call     │── inject PAT ──>│
+   │                  │                  │                  │── TLS :443 ────>│
+   │                  │                  │                  │                  │
+   │                  │                  │                  │<── tool result ──│
+   │                  │                  │<── MCP result ───│                  │
+   │                  │                  │                  │                  │
+   │                  │                  │── Claude call ──>│  (Anthropic API) │
+   │                  │                  │<── response ─────│                  │
+   │                  │<── JSON ────────│                  │                  │
+   │<── chat resp ────│                  │                  │                  │
 ```
 
 ### Why AgentGateway in the middle?
