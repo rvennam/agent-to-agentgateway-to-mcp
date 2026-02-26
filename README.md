@@ -13,60 +13,63 @@ In this workshop you will:
 ### Architecture
 
 ```
-+----------------------------------------------------------------------+
-|                         Kubernetes Cluster                            |
-|                                                                      |
-|  +----------------------------------------------------------------+  |
-|  |          Solo Agent Gateway (enterprise-agentgateway)           |  |
-|  |                                                                |  |
-|  |  /github-agent                /mcp-github                     |  |
-|  |  (HTTPRoute + URL rewrite)    (HTTPRoute + auth injection)    |  |
-|  +---------------+-------------------------------+----------------+  |
-|                  |                               |                   |
-|  +---------------v--------------+  +-------------v--------------+   |
-|  |  GitHub Agent                |  |  AgentgatewayBackend        |   |
-|  |  (ns: github-agent)         |  |  (github-mcp-backend)       |   |
-|  |                              |  |                             |   |
-|  |  Claude LLM + MCP Client ---+--->  host: api.githubcopilot   |   |
-|  |  FastAPI + Web UI            |  |  port: 443 (TLS + SNI)     |   |
-|  |  rvennam/github-agent        |  |                             |   |
-|  +------------------------------+  +-------------+--------------+   |
-|                                                   |                  |
-+---------------------------------------------------+------------------+
-                                                    |  HTTPS
-                                                    v
-                                      +----------------------------+
-                                      |  GitHub Remote MCP Server  |
-                                      |  api.githubcopilot.com     |
-                                      |                            |
-                                      |  43 tools: get_me,         |
-                                      |  get_file_contents,        |
-                                      |  create_pull_request,      |
-                                      |  search_repositories,      |
-                                      |  create_issue, ...         |
-                                      +----------------------------+
+                         Kubernetes Cluster
++--------------------------------------------------------------------+
+|                                                                    |
+|                  Solo Agent Gateway                                |
+|  +--------------------------------------------------------------+  |
+|  |                                                              |  |
+|  |   /github-agent              /mcp-github                    |  |
+|  |   (URL rewrite)              (auth injection)                |  |
+|  |        |                          |                          |  |
+|  +--------|--------------------------|--------------------------+  |
+|           |                          |                             |
+|  +--------v-----------------------+  |                             |
+|  |  GitHub Agent                  |  |                             |
+|  |  (ns: github-agent)           |  |                             |
+|  |                                |  |                             |
+|  |  Claude LLM + MCP Client -----+--+                             |
+|  |  FastAPI + Web UI              |                                |
+|  |  rvennam/github-agent          |                                |
+|  +--------------------------------+                                |
+|                                                                    |
++--------------------------------------------------------------------+
+                                       |
+                                       |  HTTPS (TLS + SNI)
+                                       v
+                          +----------------------------+
+                          |  GitHub Remote MCP Server  |
+                          |  api.githubcopilot.com     |
+                          |                            |
+                          |  43 tools: get_me,         |
+                          |  get_file_contents,        |
+                          |  create_pull_request,      |
+                          |  search_repositories,      |
+                          |  create_issue, ...         |
+                          +----------------------------+
 ```
 
 **Request flow:**
 ```
-Browser -----> AgentGateway -----> Agent Pod -----> AgentGateway -----> GitHub MCP
-               /github-agent      (Claude LLM)     /mcp-github         (remote)
-                    |                   |                |                  |
- 1. GET ----------->|                   |                |                  |
-    /github-agent   |--- rewrite / --->|                |                  |
- 2. <-- Web UI -----|<-- HTML ---------|                |                  |
-                    |                   |                |                  |
- 3. POST ---------> |--- rewrite / --->|                |                  |
-    /github-agent   |                   |-- MCP req --->|                  |
-    /chat           |                   |  tools/call   |-- inject PAT -->|
-                    |                   |               |-- TLS :443 ---->|
-                    |                   |               |<-- tool result --|
-                    |                   |<-- MCP resp --|                  |
-                    |                   |               |                  |
-                    |                   |-- Claude LLM call (Anthropic) ->|
-                    |                   |<-- assistant response ----------|
-                    |<-- JSON resp -----|               |                  |
- 4. <-- response ---|                   |               |                  |
+                                  +------------------+
+                                  |  Anthropic API   |
+                                  +--------+---------+
+                                           ^
+                                           | Claude LLM calls
+                                           |
+Browser --> AgentGateway --> Agent Pod --> AgentGateway --> GitHub MCP
+            /github-agent    (Claude)     /mcp-github      (remote)
+            (URL rewrite)                 (injects PAT)
+
+1. Browser sends chat message to /github-agent/chat
+2. AgentGateway rewrites path and forwards to Agent Pod
+3. Agent sends user message + tool definitions to Claude
+4. Claude decides to call a GitHub tool (e.g. get_me)
+5. Agent calls /mcp-github on AgentGateway via MCP
+6. AgentGateway injects the PAT and forwards to api.githubcopilot.com
+7. Tool result flows back: GitHub --> AgentGateway --> Agent
+8. Agent sends tool result to Claude, gets final answer
+9. Response flows back: Agent --> AgentGateway --> Browser
 ```
 
 ### Why AgentGateway in the middle?
