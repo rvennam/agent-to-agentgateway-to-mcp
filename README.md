@@ -13,40 +13,28 @@ In this workshop you will:
 ### Architecture
 
 ```
-                         Kubernetes Cluster
-+--------------------------------------------------------------------+
-|                                                                    |
-|                  Solo Agent Gateway                                |
-|  +--------------------------------------------------------------+  |
-|  |                                                              |  |
-|  |   /github-agent              /mcp-github                     |  |
-|  |   (URL rewrite)              (auth injection)                |  |
-|  |        |                          |                          |  |
-|  +--------|--------------------------|--------------------------+  |
-|           |                          |                             |
-|  +--------v-----------------------+  |                             |
-|  |  GitHub Agent                  |  |                             |
-|  |  (ns: github-agent)            |  |                             |
-|  |                                |  |                             |
-|  |  Claude LLM + MCP Client ------+--+                             |
-|  |  FastAPI + Web UI              |                                |
-|  |  rvennam/github-agent          |                                |
-|  +--------------------------------+                                |
-|                                                                    |
-+--------------------------------------------------------------------+
-                                       |
-                                       |  HTTPS (TLS + SNI)
-                                       v
-                          +----------------------------+
-                          |  GitHub Remote MCP Server  |
-                          |  api.githubcopilot.com     |
-                          |                            |
-                          |  43 tools: get_me,         |
-                          |  get_file_contents,        |
-                          |  create_pull_request,      |
-                          |  search_repositories,      |
-                          |  create_issue, ...         |
-                          +----------------------------+
+                User
+                 |
+                 v
+           Kubernetes Cluster                        GitHub Remote
++----------------------------------------------+    MCP Server
+|                                              |    +------------------+
+|   Solo Agent Gateway                         |    |                  |
+| +------------------------------------------+ |    | api.githubcopilot|
+| |                                          | |    | .com/mcp/        |
+| |  /github-agent         /mcp-github       | |    |                  |
+| |  (URL rewrite)         (auth injection)  | |    | 43 tools:        |
+| |       |                     |            | |    | get_me,          |
+| +-------|---------------------|------------+ |    | get_file_contents|
+|         |                     |              |    | create_issue,    |
+| +-------v-----------------+  |               |    | create_pr, ...   |
+| |  GitHub Agent           |  |  HTTPS        |    |                  |
+| |  Claude LLM             |  +---------------+--->|                  |
+| |  MCP Client             |  (injects PAT    |    |                  |
+| |  FastAPI + Web UI       |   + TLS + SNI)   |    |                  |
+| |  rvennam/github-agent   |                  |    |                  |
+| +-------------------------+                  |    +------------------+
++----------------------------------------------+
 ```
 
 **Request flow:**
